@@ -3,6 +3,7 @@ renv::load()
 library(tidyverse)
 library(circlize)
 library(RColorBrewer)
+library(GOplot)
 
 # === Load DESeq2 results ===
 DESEQ_results <- read_csv("output/DESEQ2_results.csv")
@@ -10,171 +11,88 @@ DESEQ_results <- read_csv("output/DESEQ2_results.csv")
 DESEQ_results_sig <- DESEQ_results %>%
   filter(!is.na(padj) & padj <= 0.05 & abs(log2FoldChange) >= 1)
 
-# Prepare logFC dataframe for colouring
-logfc_df <- DESEQ_results %>%
-  filter(!is.na(gene_names), !is.na(log2FoldChange)) %>%
-  select(gene = gene_names, log2FoldChange)
-
 # === Load g:Profiler results ===
-infile  <- "data/gProfiler/gProfiler_hsapiens_12-8-2025_9-23-12 pm__intersections.csv"
+infile  <- "data/gProfiler/gProfiler_hsapiens_12-8-2025_9-23-12 pm__intersections_MF.csv"
 outpref <- "output/circos"
 dir.create(dirname(outpref), recursive = TRUE, showWarnings = FALSE)
 
-df_raw <- read_csv(infile, show_col_types = FALSE)
+raw_data <- read_csv(infile)
 
-if ("adjusted_p_value" %in% names(df_raw)) {
-  df_raw$pval <- df_raw$adjusted_p_value
-} else {
-  df_raw$pval <- NA_real_
-}
-
-df <- df_raw %>%
-  mutate(term_display = stringr::str_trunc(term_name, 60))
-
-if ("intersections" %in% names(df) && !"intersection" %in% names(df)) {
-  df <- rename(df, intersection = intersections)
-}
-
-df <- df %>%
-  filter(!is.na(intersection), intersection != "")
-
-palette_terms <- function(n) {
-  # Modern, vibrant color palette for GO terms
-  base_colors <- c(
-    "#E31A1C",  # Red
-    "#1F78B4",  # Blue  
-    "#33A02C",  # Green
-    "#FF7F00",  # Orange
-    "#6A3D9A",  # Purple
-    "#B15928",  # Brown
-    "#A6CEE3",  # Light Blue
-    "#B2DF8A",  # Light Green
-    "#FB9A99",  # Pink
-    "#FDBF6F",  # Light Orange
-    "#CAB2D6",  # Light Purple
-    "#FFFF99"   # Light Yellow
-  )
-  
-  if (n <= length(base_colors)) {
-    return(base_colors[1:n])
-  } else {
-    # For more colors, use colorRampPalette to interpolate
-    return(colorRampPalette(base_colors)(n))
-  }
-}
-
-# === Build term–gene edges ===
-build_edges <- function(dfin, max_genes_per_term = 50, max_total_genes = 100) {
-  if (!"pval" %in% names(dfin)) {
-    dfin <- mutate(dfin, pval = 1)
-  }
-  term_gene <- dfin %>%
-    arrange(pval, term_display) %>%
-    select(term = term_display, intersection) %>%
-    separate_rows(intersection, sep = ",") %>%
-    mutate(gene = str_trim(intersection)) %>%
-    filter(gene != "")
-  term_gene_limited <- term_gene %>%
-    group_by(term) %>%
-    slice_head(n = max_genes_per_term) %>%
-    ungroup()
-  gene_counts <- table(term_gene_limited$gene)
-  if (length(gene_counts) > max_total_genes) {
-    top_genes <- names(sort(gene_counts, decreasing = TRUE)[1:max_total_genes])
-    term_gene_limited <- filter(term_gene_limited, gene %in% top_genes)
-  }
-  select(term_gene_limited, term, gene)
-}
-
-# === Plotting function with vertical split and log2FC ===
-make_chord <- function(
-  edges, logfc_df, tag,
-  pdf_w = 11, pdf_h = 11, png_w = 3200, png_h = 3200, res = 300,
-  transparency = 0.30, rotation_deg = 90  # vertical split
-) {
-  if (nrow(edges) == 0) return(invisible())
-
-  terms <- unique(edges$term)
-  genes <- sort(unique(edges$gene))
-  sector_order <- c(terms, genes)
-
-  # Term colours
-  term_cols <- setNames(palette_terms(length(terms)), terms)
-
-  # log2FC → colour
-  col_fun <- circlize::colorRamp2(
-    breaks = c(min(logfc_df$log2FoldChange, na.rm = TRUE),
-               0,
-               max(logfc_df$log2FoldChange, na.rm = TRUE)),
-    colors = c("blue", "white", "red")
+# === Prepare data for GOplot ===
+# Expand genes and join with expression data
+circ <- raw_data %>%
+  select(
+    Category = source,
+    ID = term_id, 
+    term = term_name,
+    Genes = intersections, 
+    adj_pval = adjusted_p_value
+  ) %>%
+  separate_longer_delim(Genes, delim = ",") %>%
+  mutate(Genes = str_trim(Genes)) %>%
+  filter(!is.na(Genes), Genes != "") %>%
+  # Join with upregulated genes only
+  left_join(
+    DESEQ_results_sig %>% 
+      filter(log2FoldChange > 0) %>%
+      select(gene_names, log2FoldChange),
+    by = c("Genes" = "gene_names")
+  ) %>%
+  filter(!is.na(log2FoldChange)) %>%
+  select(
+    category = Category,
+    ID = ID,
+    term = term,
+    genes = Genes,
+    adj_pval = adj_pval,
+    logFC = log2FoldChange
   )
 
-  gene_fc <- logfc_df %>%
-    filter(gene %in% genes) %>%
-    mutate(colour = col_fun(log2FoldChange))
+print("Circ object ready:")
+head(circ)
 
-  # Grey for missing genes
-  missing_genes <- setdiff(genes, gene_fc$gene)
-  if (length(missing_genes) > 0) {
-    gene_fc <- bind_rows(
-      gene_fc,
-      tibble(gene = missing_genes, log2FoldChange = NA, colour = "#BBBBBB")
-    )
-  }
+# === Create chord matrix ===
+process_list <- unique(circ$term)
+chord <- chord_dat(data = circ, process = process_list)
 
-  gene_cols <- setNames(gene_fc$colour, gene_fc$gene)
-  grid_cols <- c(term_cols, gene_cols)
+# Add logFC values to chord matrix
+gene_logfc <- circ %>%
+  select(genes, logFC) %>%
+  distinct()
 
-  # Gap between blocks
-  gap_terms <- rep(2, length(terms))
-  if (length(gap_terms)) gap_terms[length(gap_terms)] <- 8
-  gaps <- c(gap_terms, rep(1, length(genes)))
+chord_final <- chord %>%
+  as.data.frame() %>%
+  rownames_to_column("genes") %>%
+  left_join(gene_logfc, by = "genes") %>%
+  column_to_rownames("genes")
 
-  plot_fun <- function() {
-    circos.clear()
-    circos.par(start.degree = rotation_deg, clock.wise = TRUE, gap.after = gaps)
-    chordDiagram(
-      x = edges,
-      order = sector_order,
-      grid.col = grid_cols,
-      transparency = transparency,
-      annotationTrack = NULL,
-      preAllocateTracks = list(track.height = 0.06)
-    )
-    circos.track(track.index = 1, panel.fun = function(x, y) {
-      xlim <- get.cell.meta.data("xlim")
-      ylim <- get.cell.meta.data("ylim")
-      nm <- get.cell.meta.data("sector.index")
-      if (nm %in% genes) {
-        circos.text(mean(xlim), ylim[1], nm, facing = "clockwise",
-                    niceFacing = TRUE, adj = c(0, 0.5), cex = 0.8)
-      } else {
-        circos.text(mean(xlim), ylim[1], nm, facing = "inside",
-                    niceFacing = TRUE, adj = c(0.5, 0), cex = 0.9)
-      }
-    }, bg.border = NA)
-  }
+print("Final chord matrix:")
+head(chord_final)
 
-  # PDF
-  pdf(file.path(dirname(outpref), paste0(basename(outpref), "_", tag, ".pdf")), pdf_w, pdf_h)
-  plot_fun()
-  dev.off()
+# === Create and save chord plot ===
+chord_plot <- GOChord(
+  data = chord_final, 
+  title = 'GO Molecular Function Enrichment',
+  space = 0.02, 
+  gene.order = 'logFC',
+  gene.space = 0.25, 
+  gene.size = 4,
+  nlfc = 1,
+  ribbon.col = brewer.pal(length(process_list), "Set2"),
+  border.size = 0.5,
+  process.label = 8, 
+  limit = c(20,0)
+)
 
-  # PNG
-  png(file.path(dirname(outpref), paste0(basename(outpref), "_", tag, ".png")), png_w, png_h, res = res)
-  plot_fun()
-  dev.off()
-}
+print(chord_plot)
 
-# === Ontology mapping and plotting ===
-ont_map <- c(MF = "GO:MF", BP = "GO:BP", CC = "GO:CC")
+ggsave(
+  filename = paste0(outpref, "_GOplot_chord.png"),
+  plot = chord_plot,
+  width = 14,
+  height = 12,
+  dpi = 300,
+  bg = "white"
+)
 
-for (nm in names(ont_map)) {
-  cat_code <- ont_map[[nm]]
-  cat_df <- filter(df, source == cat_code)
-  cat_edges <- build_edges(cat_df, max_genes_per_term = 15, max_total_genes = 60)
-  n_terms <- length(unique(cat_edges$term))
-  n_genes <- length(unique(cat_edges$gene))
-  message("Ontology ", nm, ": terms=", n_terms, " genes=", n_genes, " edges=", nrow(cat_edges))
-  make_chord(cat_edges, logfc_df, nm)
-}
+print("Chord plot created and saved!")
