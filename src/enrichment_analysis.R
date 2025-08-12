@@ -152,7 +152,7 @@ ont_map <- c(MF = "GO:MF", BP = "GO:BP", CC = "GO:CC")
 for (nm in names(ont_map)) {
   cat_code <- ont_map[[nm]]
   cat_df <- filter(df, source == cat_code)
-  cat_edges <- build_edges(cat_df, max_genes_per_term = 25, max_total_genes = 70)
+  cat_edges <- build_edges(cat_df, max_genes_per_term = 15, max_total_genes = 60)
   n_terms <- length(unique(cat_edges$term))
   n_genes <- length(unique(cat_edges$gene))
   message("Ontology ", nm, ": terms=", n_terms, " genes=", n_genes, " edges=", nrow(cat_edges))
