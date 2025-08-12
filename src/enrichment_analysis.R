@@ -39,8 +39,28 @@ df <- df %>%
   filter(!is.na(intersection), intersection != "")
 
 palette_terms <- function(n) {
-  if (n <= 12) RColorBrewer::brewer.pal(max(3, n), "Set3") else
-    colorRampPalette(RColorBrewer::brewer.pal(12, "Set3"))(n)
+  # Modern, vibrant color palette for GO terms
+  base_colors <- c(
+    "#E31A1C",  # Red
+    "#1F78B4",  # Blue  
+    "#33A02C",  # Green
+    "#FF7F00",  # Orange
+    "#6A3D9A",  # Purple
+    "#B15928",  # Brown
+    "#A6CEE3",  # Light Blue
+    "#B2DF8A",  # Light Green
+    "#FB9A99",  # Pink
+    "#FDBF6F",  # Light Orange
+    "#CAB2D6",  # Light Purple
+    "#FFFF99"   # Light Yellow
+  )
+  
+  if (n <= length(base_colors)) {
+    return(base_colors[1:n])
+  } else {
+    # For more colors, use colorRampPalette to interpolate
+    return(colorRampPalette(base_colors)(n))
+  }
 }
 
 # === Build term–gene edges ===
