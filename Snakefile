@@ -2,7 +2,7 @@ rule all:
 	input:
 		"output/DESEQ2_results.csv",
 		"output/DESEQ2_results_sig.csv",
-		"output/circos/GOplot_chord_MF.pdf"
+		expand("output/enrichment/GOplot_chord_{ontology}.pdf", ontology=["MF", "BP", "CC"])
 
 rule differential_expression:
 	input:
@@ -18,10 +18,10 @@ rule differential_expression:
 rule enrichment_analysis:
 	input:
 		deseq_results="output/DESEQ2_results.csv",
-		gprofiler_data="data/gProfiler/gProfiler_hsapiens_12-8-2025_9-23-12 pm__intersections_MF.csv"
+		gprofiler_data="data/gProfiler/gProfiler_hsapiens_12-8-2025_9-23-12 pm__intersections_{ontology}.csv"
 	output:
-		chord_plot="output/circos/GOplot_chord_MF.pdf",
-		circ_data="output/circos/circ_data.csv"
+		chord_plot="output/enrichment/GOplot_chord_{ontology}.pdf",
+		circ_data="output/enrichment/circ_data_{ontology}.csv"
 	script:
 		"src/enrichment_analysis.R"
 

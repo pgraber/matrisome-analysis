@@ -16,6 +16,9 @@ gprofiler_file <- snakemake@input[["gprofiler_data"]]
 chord_output <- snakemake@output[["chord_plot"]]
 circ_output <- snakemake@output[["circ_data"]]
 
+# Get ontology from wildcards for title
+ontology <- snakemake@wildcards[["ontology"]]
+
 # Create output directory
 output_dir <- dirname(chord_output)
 dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
@@ -94,7 +97,7 @@ chord_final <- chord %>%
 # Create and save chord plot
 chord_plot <- GOChord(
   data = chord_final,
-  title = 'GO Molecular Function Enrichment (Top 15 genes per term)',
+  title = paste0('GO ', ontology, ' Enrichment (Top 15 genes per term)'),
   space = 0.02,
   gene.order = 'logFC',
   gene.space = 0.2,
