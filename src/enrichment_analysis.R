@@ -19,7 +19,6 @@ dir.create(dirname(outpref), recursive = TRUE, showWarnings = FALSE)
 raw_data <- read_csv(infile)
 
 # === Prepare data for GOplot ===
-# Expand genes and join with expression data
 circ <- raw_data %>%
   select(
     Category = source,
@@ -48,15 +47,26 @@ circ <- raw_data %>%
     logFC = log2FoldChange
   )
 
-print("Circ object ready:")
-head(circ)
+print("Original circ object:")
+print(paste("Total gene-term pairs:", nrow(circ)))
 
-# === Create chord matrix ===
-process_list <- unique(circ$term)
-chord <- chord_dat(data = circ, process = process_list)
+# === Filter to reduce number of genes ===
+circ_filtered <- circ %>%
+  group_by(term) %>%
+  arrange(desc(logFC)) %>%
+  slice_head(n = 15) %>%  # Top 15 genes per term
+  ungroup()
+
+print("Filtered circ object:")
+print(paste("Reduced to gene-term pairs:", nrow(circ_filtered)))
+print(paste("Unique genes:", length(unique(circ_filtered$genes))))
+
+# === Create chord matrix with filtered data ===
+process_list <- unique(circ_filtered$term)
+chord <- chord_dat(data = circ_filtered, process = process_list)
 
 # Add logFC values to chord matrix
-gene_logfc <- circ %>%
+gene_logfc <- circ_filtered %>%
   select(genes, logFC) %>%
   distinct()
 
@@ -67,12 +77,12 @@ chord_final <- chord %>%
   column_to_rownames("genes")
 
 print("Final chord matrix:")
-head(chord_final)
+print(paste("Matrix dimensions:", nrow(chord_final), "x", ncol(chord_final)))
 
 # === Create and save chord plot ===
 chord_plot <- GOChord(
   data = chord_final, 
-  title = 'GO Molecular Function Enrichment',
+  title = 'GO Molecular Function Enrichment (Top 15 genes per term)',
   space = 0.02, 
   gene.order = 'logFC',
   gene.space = 0.25, 
@@ -80,19 +90,16 @@ chord_plot <- GOChord(
   nlfc = 1,
   ribbon.col = brewer.pal(length(process_list), "Set2"),
   border.size = 0.5,
-  process.label = 8, 
-  limit = c(20,0)
+  process.label = 8
 )
 
 print(chord_plot)
 
 ggsave(
-  filename = paste0(outpref, "_GOplot_chord.png"),
+  filename = paste0(outpref, "_GOplot_chord_filtered.pdf"),
   plot = chord_plot,
-  width = 14,
-  height = 12,
-  dpi = 300,
-  bg = "white"
+  width = 12,
+  height = 12
 )
 
-print("Chord plot created and saved!")
+print("Filtered chord plot created and saved!")
