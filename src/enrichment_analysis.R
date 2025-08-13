@@ -1,40 +1,53 @@
+# Load environment and libraries
 renv::load()
 
 library(tidyverse)
 library(circlize)
 library(RColorBrewer)
 library(GOplot)
+library(viridis)
+library(here)
 
-# === Load DESeq2 results ===
-DESEQ_results <- read_csv("output/DESEQ2_results.csv")
+# Input files
+deseq_file <- here("output", "DESEQ2_results.csv")
+gprofiler_file <- here("data", "gProfiler", "gProfiler_hsapiens_12-8-2025_9-23-12 pm__intersections_MF.csv")
+
+# Output directory
+output_dir <- here("output", "circos")
+dir.create(output_dir, recursive = TRUE)
+
+# Load DESeq2 results
+DESEQ_results <- read_csv(deseq_file)
 
 DESEQ_results_sig <- DESEQ_results %>%
   filter(!is.na(padj) & padj <= 0.05 & abs(log2FoldChange) >= 1)
 
-# === Load g:Profiler results ===
-infile  <- "data/gProfiler/gProfiler_hsapiens_12-8-2025_9-23-12 pm__intersections_MF.csv"
-outpref <- "output/circos"
-dir.create(dirname(outpref), recursive = TRUE, showWarnings = FALSE)
+# Load g:Profiler results
+raw_data <- read_csv(gprofiler_file)
 
-raw_data <- read_csv(infile)
+### Prepare data for GOPlot input ###
 
-# === Prepare data for GOplot ===
-circ <- raw_data %>%
+# Select and rename columns
+go_data <- raw_data %>%
   select(
     Category = source,
-    ID = term_id, 
+    ID = term_id,
     term = term_name,
-    Genes = intersections, 
+    Genes = intersections,
     adj_pval = adjusted_p_value
-  ) %>%
+  )
+
+# Expand gene lists
+go_expanded <- go_data %>%
   separate_longer_delim(Genes, delim = ",") %>%
   mutate(Genes = str_trim(Genes)) %>%
-  filter(!is.na(Genes), Genes != "") %>%
-  # Join with upregulated genes only
+  filter(!is.na(Genes), Genes != "")
+
+# Join with all significant genes
+circ <- go_expanded %>%
   left_join(
     DESEQ_results_sig %>% 
-      filter(log2FoldChange > 0) %>%
-      select(gene_names, log2FoldChange),
+      select(gene_names, log2FoldChange),  
     by = c("Genes" = "gene_names")
   ) %>%
   filter(!is.na(log2FoldChange)) %>%
@@ -47,25 +60,24 @@ circ <- raw_data %>%
     logFC = log2FoldChange
   )
 
-print("Original circ object:")
-print(paste("Total gene-term pairs:", nrow(circ)))
+# Save circ object
+circ_file <- here(output_dir, "circ_data.csv")
+write_csv(circ, circ_file)
 
-# === Filter to reduce number of genes ===
+###
+
+# Filter to top genes per term
 circ_filtered <- circ %>%
   group_by(term) %>%
   arrange(desc(logFC)) %>%
-  slice_head(n = 15) %>%  # Top 15 genes per term
+  slice_head(n = 15) %>%
   ungroup()
 
-print("Filtered circ object:")
-print(paste("Reduced to gene-term pairs:", nrow(circ_filtered)))
-print(paste("Unique genes:", length(unique(circ_filtered$genes))))
-
-# === Create chord matrix with filtered data ===
+# Create chord matrix
 process_list <- unique(circ_filtered$term)
 chord <- chord_dat(data = circ_filtered, process = process_list)
 
-# Add logFC values to chord matrix
+# Add logFC values to matrix
 gene_logfc <- circ_filtered %>%
   select(genes, logFC) %>%
   distinct()
@@ -76,30 +88,38 @@ chord_final <- chord %>%
   left_join(gene_logfc, by = "genes") %>%
   column_to_rownames("genes")
 
-print("Final chord matrix:")
-print(paste("Matrix dimensions:", nrow(chord_final), "x", ncol(chord_final)))
-
-# === Create and save chord plot ===
+# Create and save chord plot
 chord_plot <- GOChord(
-  data = chord_final, 
+  data = chord_final,
   title = 'GO Molecular Function Enrichment (Top 15 genes per term)',
-  space = 0.02, 
+  space = 0.02,
   gene.order = 'logFC',
-  gene.space = 0.25, 
+  gene.space = 0.2,
   gene.size = 4,
   nlfc = 1,
-  ribbon.col = brewer.pal(length(process_list), "Set2"),
-  border.size = 0.5,
+  lfc.col = c("blue", "white", "red"),
+  lfc.min = 0,
+  lfc.max = 100,
+  ribbon.col = brewer.pal(length(process_list), "Set3"),
+  border.size = 0.2,
   process.label = 8
 )
 
-print(chord_plot)
+# Add your custom color scale
+chord_plot_custom <- chord_plot +
+  scale_fill_viridis_c(
+    option = "viridis",
+    name = "log2FC",
+    direction = -1
+  ) 
 
+print(chord_plot_custom)
+
+# Save output
+output_file <- here(output_dir, "GOplot_chord_MF.pdf")
 ggsave(
-  filename = paste0(outpref, "_GOplot_chord_filtered.pdf"),
-  plot = chord_plot,
+  filename = output_file,
+  plot = chord_plot_custom,
   width = 12,
   height = 12
 )
-
-print("Filtered chord plot created and saved!")
