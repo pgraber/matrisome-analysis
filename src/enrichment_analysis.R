@@ -8,13 +8,17 @@ library(GOplot)
 library(viridis)
 library(here)
 
-# Input files
-deseq_file <- here("output", "DESEQ2_results.csv")
-gprofiler_file <- here("data", "gProfiler", "gProfiler_hsapiens_12-8-2025_9-23-12 pm__intersections_MF.csv")
+# Input files from Snakemake
+deseq_file <- snakemake@input[["deseq_results"]]
+gprofiler_file <- snakemake@input[["gprofiler_data"]]
 
-# Output directory
-output_dir <- here("output", "circos")
-dir.create(output_dir, recursive = TRUE)
+# Output files from Snakemake
+chord_output <- snakemake@output[["chord_plot"]]
+circ_output <- snakemake@output[["circ_data"]]
+
+# Create output directory
+output_dir <- dirname(chord_output)
+dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 
 # Load DESeq2 results
 DESEQ_results <- read_csv(deseq_file)
@@ -61,8 +65,7 @@ circ <- go_expanded %>%
   )
 
 # Save circ object
-circ_file <- here(output_dir, "circ_data.csv")
-write_csv(circ, circ_file)
+write_csv(circ, circ_output)
 
 ###
 
@@ -70,7 +73,7 @@ write_csv(circ, circ_file)
 circ_filtered <- circ %>%
   group_by(term) %>%
   arrange(desc(logFC)) %>%
-  slice_head(n = 15) %>%
+  slice_head(n = 12) %>%
   ungroup()
 
 # Create chord matrix
@@ -116,10 +119,9 @@ chord_plot_custom <- chord_plot +
 print(chord_plot_custom)
 
 # Save output
-output_file <- here(output_dir, "GOplot_chord_MF.pdf")
 ggsave(
-  filename = output_file,
+  filename = chord_output,
   plot = chord_plot_custom,
-  width = 12,
-  height = 12
+  width = 18,
+  height = 18
 )

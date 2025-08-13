@@ -1,7 +1,8 @@
 rule all:
 	input:
 		"output/DESEQ2_results.csv",
-		"output/DESEQ2_results_sig.csv"
+		"output/DESEQ2_results_sig.csv",
+		"output/circos/GOplot_chord_MF.pdf"
 
 rule differential_expression:
 	input:
@@ -13,4 +14,14 @@ rule differential_expression:
 		sig="output/DESEQ2_results_sig.csv"
 	script:
 		"src/differential_expression.R"
+
+rule enrichment_analysis:
+	input:
+		deseq_results="output/DESEQ2_results.csv",
+		gprofiler_data="data/gProfiler/gProfiler_hsapiens_12-8-2025_9-23-12 pm__intersections_MF.csv"
+	output:
+		chord_plot="output/circos/GOplot_chord_MF.pdf",
+		circ_data="output/circos/circ_data.csv"
+	script:
+		"src/enrichment_analysis.R"
 
