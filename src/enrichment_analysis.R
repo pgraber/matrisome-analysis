@@ -29,7 +29,56 @@ DESEQ_results <- read_csv(deseq_file)
 DESEQ_results_sig <- DESEQ_results %>%
   filter(!is.na(padj) & padj <= 0.05 & abs(log2FoldChange) >= 1)
 
-# Load g:Profiler results
+# Read all gProfiler files to calculate global limits from combined datasets
+gprofiler_files <- c(
+  "data/gProfiler/gProfiler_hsapiens_12-8-2025_9-23-12 pm__intersections_MF.csv",
+  "data/gProfiler/gProfiler_hsapiens_12-8-2025_9-23-12 pm__intersections_BP.csv",
+  "data/gProfiler/gProfiler_hsapiens_12-8-2025_9-23-12 pm__intersections_CC.csv"
+)
+
+# Function to process each gProfiler file and get genes with logFC
+process_gprofiler_file <- function(file_path) {
+  raw_data <- read_csv(file_path)
+  
+  # Select and rename columns
+  go_data <- raw_data %>%
+    select(
+      Category = source,
+      ID = term_id,
+      term = term_name,
+      Genes = intersections,
+      adj_pval = adjusted_p_value
+    )
+  
+  # Expand gene lists
+  go_expanded <- go_data %>%
+    separate_rows(Genes, sep = ",") %>%
+    filter(!is.na(Genes) & Genes != "")
+  
+  # Join with significant genes
+  circ <- go_expanded %>%
+    inner_join(DESEQ_results_sig, by = c("Genes" = "gene_names")) %>%
+    select(
+      Category,
+      ID,
+      term,
+      genes = Genes,
+      adj_pval,
+      logFC = log2FoldChange
+    )
+  
+  return(circ)
+}
+
+# Process all files and combine
+all_go_data <- map_dfr(gprofiler_files, process_gprofiler_file)
+
+# Calculate global limits from all GO genes across all ontologies
+global_min <- min(all_go_data$logFC, na.rm = TRUE)
+global_max <- max(all_go_data$logFC, na.rm = TRUE)
+global_limits <- c(global_min, global_max)
+
+# Load g:Profiler results for current ontology
 raw_data <- read_csv(gprofiler_file)
 
 ### Prepare data for GOPlot input ###
@@ -98,25 +147,26 @@ chord_final <- chord %>%
 chord_plot <- GOChord(
   data = chord_final,
   title = paste0('GO ', ontology, ' Enrichment (Top 15 genes per term)'),
-  space = 0.02,
+  space = 0.01,
   gene.order = 'logFC',
   gene.space = 0.2,
-  gene.size = 4,
+  gene.size = 6,
   nlfc = 1,
   lfc.col = c("blue", "white", "red"),
   lfc.min = 0,
   lfc.max = 100,
-  ribbon.col = brewer.pal(length(process_list), "Set3"),
-  border.size = 0.2,
+  ribbon.col = viridis::viridis(length(process_list), option = "D"),
+  border.size = 0,    
   process.label = 8
 )
 
-# Add your custom color scale
+# Add your custom red color scale with global limits
 chord_plot_custom <- chord_plot +
-  scale_fill_viridis_c(
-    option = "viridis",
+  scale_fill_gradient(
+    low = "#FFE6E6",    
+    high = "red",
     name = "log2FC",
-    direction = -1
+    limits = global_limits
   ) 
 
 print(chord_plot_custom)
