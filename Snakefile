@@ -2,7 +2,9 @@ rule all:
 	input:
 		"output/DESEQ2_results.csv",
 		"output/DESEQ2_results_sig.csv",
-		expand("output/enrichment/GOplot_chord_{ontology}.pdf", ontology=["MF", "BP", "CC"])
+		expand("output/enrichment/GOplot_chord_{ontology}.pdf", ontology=["MF", "BP", "CC"]),
+		"output/Matrisome_DESEQ_results_ECM_annotated.csv",
+		"output/CoreMatrisome_DESEQ_results_sig.csv",
 
 rule differential_expression:
 	input:
@@ -18,10 +20,18 @@ rule differential_expression:
 rule enrichment_analysis:
 	input:
 		deseq_results="output/DESEQ2_results.csv",
-		gprofiler_data="data/gProfiler/gProfiler_hsapiens_12-8-2025_9-23-12 pm__intersections_{ontology}.csv"
+		gprofiler_data="data/gProfiler/gProfiler_hsapiens_15-8-2025_11-27-03 am__intersections_{ontology}.csv"
 	output:
 		chord_plot="output/enrichment/GOplot_chord_{ontology}.pdf",
 		circ_data="output/enrichment/circ_data_{ontology}.csv"
 	script:
 		"src/enrichment_analysis.R"
 
+rule annotate_matrisome:
+    input:
+        "output/DESEQ2_results_sig.csv"
+    output:
+        all="output/Matrisome_DESEQ_results_ECM_annotated.csv",
+        core="output/CoreMatrisome_DESEQ_results_sig.csv"
+    script:
+        "src/annotate_matrisome.R"
