@@ -5,6 +5,7 @@ rule all:
 		expand("output/enrichment/GOplot_chord_{ontology}.pdf", ontology=["MF", "BP", "CC"]),
 		"output/Matrisome_DESEQ_results_ECM_annotated.csv",
 		"output/CoreMatrisome_DESEQ_results_sig.csv",
+		"output/CoreMatrisome_DEG_barplot.pdf"
 
 rule differential_expression:
 	input:
@@ -35,3 +36,12 @@ rule annotate_matrisome:
         core="output/CoreMatrisome_DESEQ_results_sig.csv"
     script:
         "src/annotate_matrisome.R"
+
+rule deg_barplot:
+    input:
+        deseq_sig="output/DESEQ2_results_sig.csv",
+        matrisome="output/CoreMatrisome_DESEQ_results_sig.csv"
+    output:
+        "output/CoreMatrisome_DEG_barplot.pdf"
+    script:
+        "src/deg_barplot.R"
