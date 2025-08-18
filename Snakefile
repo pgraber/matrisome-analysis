@@ -7,7 +7,8 @@ rule all:
 		"output/Matrisome_DESEQ_results_annotated_sig.csv",
 		"output/CoreMatrisome_DESEQ_results_sig.csv",
 		"output/CoreMatrisome_DEG_barplot.pdf",
-		"output/dotplot_matrisome_all.pdf"
+		"output/dotplot_matrisome_all.pdf",
+		"output/dotplot_CoreMatrisome.pdf"
 
 rule differential_expression:
 	input:
@@ -57,3 +58,11 @@ rule matrisome_dotplot:
         "output/dotplot_matrisome_all.pdf"
     script:
         "src/matrisome_dotplot.R"
+
+rule core_matrisome_dotplot:
+    input:
+        "output/CoreMatrisome_DESEQ_results_sig.csv"
+    output:
+        "output/dotplot_CoreMatrisome.pdf"
+    script:
+        "src/core_matrisome_dotplot.R"
