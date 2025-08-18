@@ -1,3 +1,5 @@
+renv::load()
+
 library(tidyverse)
 library(readr)
 library(ggplot2)
