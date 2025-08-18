@@ -3,7 +3,8 @@ rule all:
 		"output/DESEQ2_results.csv",
 		"output/DESEQ2_results_sig.csv",
 		expand("output/enrichment/GOplot_chord_{ontology}.pdf", ontology=["MF", "BP", "CC"]),
-		"output/Matrisome_DESEQ_results_ECM_annotated.csv",
+		"output/Matrisome_DESEQ_results_annotated.csv",
+		"output/Matrisome_DESEQ_results_annotated_sig.csv",
 		"output/CoreMatrisome_DESEQ_results_sig.csv",
 		"output/CoreMatrisome_DEG_barplot.pdf"
 
@@ -30,10 +31,12 @@ rule enrichment_analysis:
 
 rule annotate_matrisome:
     input:
-        "output/DESEQ2_results_sig.csv"
+        all_results="output/DESEQ2_results.csv",
+        sig_results="output/DESEQ2_results_sig.csv"
     output:
-        all="output/Matrisome_DESEQ_results_ECM_annotated.csv",
-        core="output/CoreMatrisome_DESEQ_results_sig.csv"
+        all_annotated="output/Matrisome_DESEQ_results_annotated.csv",
+        sig_annotated="output/Matrisome_DESEQ_results_annotated_sig.csv",
+        core_sig="output/CoreMatrisome_DESEQ_results_sig.csv"
     script:
         "src/annotate_matrisome.R"
 
