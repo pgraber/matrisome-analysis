@@ -2,6 +2,9 @@ library(tidyverse)
 library(readr)
 library(MatrisomeAnalyzeR)
 
+source("scripts/validate.R")
+vcheck_init("output/checks", step = "annotate_matrisome", append = TRUE)
+
 # Get input and output from snakemake
 deseq_all_file <- snakemake@input$all_results
 deseq_sig_file <- snakemake@input$sig_results
@@ -14,6 +17,8 @@ data_all <- read_csv(deseq_all_file, show_col_types = FALSE)
 
 # Annotate all genes according to their matrisome status
 ECM_all_annotated <- matriannotate(data = as.data.frame(data_all), gene.column = "gene_names", species = "human")
+vcheck("annotation preserves gene count", nrow(ECM_all_annotated), nrow(data_all),
+       source = "DESeq2 result rows, counted before annotation")
 
 # Write all annotated genes (complete dataset)
 write_csv(ECM_all_annotated, output_all_annotated)
@@ -23,6 +28,12 @@ data_sig <- read_csv(deseq_sig_file, show_col_types = FALSE)
 
 # Annotate significant genes according to their matrisome status
 ECM_sig_annotated <- matriannotate(data = as.data.frame(data_sig), gene.column = "gene_names", species = "human")
+vcheck("annotation preserves significant gene count", nrow(ECM_sig_annotated), nrow(data_sig),
+       source = "significant DESeq2 result rows, counted before annotation")
+vcheck("matrisome divisions are from the expected vocabulary",
+       all(unique(ECM_sig_annotated$`Annotated Matrisome Division`) %in%
+           c("Core matrisome", "Matrisome-associated", "Non-matrisome", "N/A")), TRUE,
+       source = "MatrisomeAnalyzeR division vocabulary")
 
 # Write all significant annotated genes
 write_csv(ECM_sig_annotated, output_sig_annotated)
@@ -31,4 +42,7 @@ write_csv(ECM_sig_annotated, output_sig_annotated)
 ECM_core <- ECM_sig_annotated[ECM_sig_annotated$`Annotated Matrisome Division` == "Core matrisome", ]
 
 # Write core matrisome genes (from significant results)
+vcheck("core matrisome is a subset of significant genes",
+       nrow(ECM_core) <= nrow(ECM_sig_annotated), TRUE, source = "arithmetic")
 write_csv(ECM_core, output_core_sig)
+vcheck_summary()
