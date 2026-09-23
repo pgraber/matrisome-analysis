@@ -1,71 +1,68 @@
-# Matrisome Analysis
+# matrisome-analysis
 
 A Snakemake workflow for differential expression and extracellular matrix (matrisome) analysis of
-bulk RNA-seq data, comparing paediatric tumour samples against normal brain reference samples.
+bulk RNA-seq, comparing tumour samples against normal brain reference samples.
 
-## What it does
+## Workflow summary
 
-The workflow runs end to end from raw count matrices to publication figures:
+1. **Differential expression.** DESeq2 on tumour versus normal brain counts. Normal-brain technical
+   replicates are averaged per donor first, and genes are reconciled on symbol.
+2. **Functional enrichment.** g:Profiler results rendered as GOplot chord diagrams for molecular
+   function, biological process and cellular component.
+3. **Matrisome annotation.** Differentially expressed genes annotated with MatrisomeAnalyzeR, split
+   into core matrisome and matrisome-associated.
+4. **Figures.** Barplots of core matrisome differential expression, and dotplots of effect size and
+   significance across matrisome categories.
 
-1. **Differential expression** (`src/differential_expression.R`). DESeq2 on tumour versus normal
-   brain counts, producing the full and significance-filtered result tables.
-2. **Functional enrichment** (`src/enrichment_analysis.R`). g:Profiler results rendered as GOplot
-   chord diagrams for molecular function, biological process and cellular component.
-3. **Matrisome annotation** (`src/annotate_matrisome.R`). Annotates differentially expressed genes
-   against the matrisome classification, separating core matrisome from matrisome-associated genes.
-4. **Figures** (`src/deg_barplot.R`, `src/matrisome_dotplot.R`, `src/core_matrisome_dotplot.R`,
-   `src/pvalue_dotplot.R`). Barplots of core matrisome differential expression and dotplots of
-   effect size and significance across matrisome categories.
+## Usage
 
-Every step is declared as a Snakemake rule with explicit inputs and outputs, so the dependency graph
-is the pipeline and any step can be rerun in isolation.
-
-## Validation
-
-Every step asserts the shape of what it produced, immediately after producing it, against a value
-known from outside the code that produced it. Checks print to the terminal as the workflow runs and
-append to `output/checks.log` and `output/checks.tsv`. A failed check stops the run, because nothing
-downstream should execute on data of the wrong shape.
-
-What is asserted: the tumour sample count against the metadata sheet, gene count after the
-tumour-to-normal join against the identifier intersection computed before the join, uniqueness of
-gene IDs, non-negativity of counts, p-values within their defined range, and that matrisome
-annotation neither drops nor duplicates a gene. The helper is `scripts/validate.R`.
-
-`output/checks.log` and `output/checks.tsv` are the only outputs committed. Everything else in
-`output/` is gitignored.
-
-## Method decisions
-
-`docs/adr/0001-differential-expression-and-thresholds.md` records why counts rather than normalised
-values go into DESeq2, why genes are reconciled on symbol, why the expression filter is stricter than
-the DESeq2 default, and why the log2 fold change threshold is 2 rather than the conventional 1. It
-also states the limitation that dataset and biological condition are confounded in this design.
-
-## Running it
-
-```
+```bash
 snakemake --cores 4
 ```
 
-`rule all` declares the full target set. Outputs are written to `output/`.
+`rule all` declares the full target set, so any single output can also be requested by name.
 
-## Input data
+## Inputs
 
-Input count matrices and metadata are not included in this repository. The workflow expects:
+Not included in this repository. `data/` is gitignored.
 
-- tumour RNA-seq counts, from a controlled-access cohort
-- normal brain RNA-seq counts, from a public reference resource
-- a sample metadata table
-- g:Profiler enrichment exports
+| Input | Format |
+|---|---|
+| Tumour RNA-seq counts | TSV, genes by samples, from a controlled-access cohort |
+| Normal brain RNA-seq counts | TSV, compound `ENSG\|SYMBOL` gene identifiers, multiple columns per donor |
+| Sample metadata | XLSX with `Patient_ID` and `Type` columns |
+| g:Profiler enrichment exports | CSV, one per ontology |
 
-Paths are declared at the top of each rule in the `Snakefile`. Controlled-access data is never
-committed here, and `data/` is gitignored.
+Paths are declared per rule in the `Snakefile`.
 
-## Layout note
+## Outputs
 
-Analysis scripts live in `src/` rather than `scripts/`, which is where the Snakefile expects them.
-`scripts/` holds the validation helper only.
+Written to `output/` and gitignored.
+
+| Output | Contents |
+|---|---|
+| `DESEQ2_results.csv`, `DESEQ2_results_sig.csv` | All and significant DESeq2 results |
+| `Matrisome_DESEQ_results_annotated*.csv` | Results annotated by matrisome division |
+| `CoreMatrisome_DESEQ_results_sig.csv` | Significant core matrisome genes |
+| `enrichment/GOplot_chord_{MF,BP,CC}.pdf` | Enrichment chord diagrams |
+| `CoreMatrisome_DEG_barplot.pdf`, `dotplot_*.pdf` | Figures |
+
+## Parameters
+
+Set at the top of `src/differential_expression.R`.
+
+| Parameter | Default | Meaning |
+|---|---|---|
+| `thr` | 10 | A gene is kept if it exceeds this count in more than half the samples |
+| `lfc_cutoff` | 2 | Absolute log2 fold change required for significance, alongside adjusted p ≤ 0.05 |
+
+## Requirements
+
+R with DESeq2, MatrisomeAnalyzeR, GOplot, tidyverse, readxl and readr. Snakemake 7 or later.
+
+## Licence
+
+MIT. See `LICENSE`.
 
 ## Author
 

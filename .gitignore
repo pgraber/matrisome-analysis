@@ -1,12 +1,8 @@
 # Data and outputs are never committed. The validation record is the exception.
 data/
-results/*
-!results/checks.log
-!results/checks.tsv
+results/
 figures/
-output/*
-!output/checks.log
-!output/checks.tsv
+output/
 
 # R
 .Rproj.user/
