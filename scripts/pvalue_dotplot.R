@@ -2,8 +2,12 @@ library(tidyverse)
 library(readr)
 library(ggplot2)
 
+# Get input and output from snakemake
+core_matrisome_file <- snakemake@input[[1]]
+output_file <- snakemake@output[[1]]
+
 # Read the core matrisome DEG results (all significant core matrisome genes)
-dataframe_matrisome <- read_csv("output/CoreMatrisome_DESEQ_results_sig.csv", show_col_types = FALSE)
+dataframe_matrisome <- read_csv(core_matrisome_file, show_col_types = FALSE)
 
 # Define breakpoints for p-value groups
 breakpoints <- c(0, 1e-15, 1e-10, 1e-5, Inf)
@@ -12,6 +16,7 @@ breakpoints <- c(0, 1e-15, 1e-10, 1e-5, Inf)
 dataframe_matrisome$pvalue_group <- cut(dataframe_matrisome$padj, breaks = breakpoints, labels = c("<1e-15", "1e-15 to 1e-10", "1e-10 to 1e-5", ">1e-5"))
 
 # Define dot sizes for each p-value group (reversed order)
+size_mapping <- c(">1e-5" = 4, "1e-10 to 1e-5" = 5, "1e-15 to 1e-10" = 6, "<1e-15" = 7)
 # Define colors for specific matrisome categories
 category_colors <- c(
   "ECM Glycoproteins" = "#337EC1",
@@ -35,8 +40,7 @@ size_plot <- ggplot(dataframe_matrisome, aes(x = log2FoldChange, y = `Annotated 
        color = "Matrisome Category",
        title = "Core Matrisome DEGs - P-value Distribution") +
   theme_minimal() +
-  scale_x_continuous(breaks = c(-4, -2, 0, 2, 4), labels = c("-4", "-2", "0", "2", "4")) +
-  coord_cartesian(xlim = c(-4, 4)) +
+  scale_x_continuous(breaks = c(-4, -2, 0, 2, 4), limits = c(-4.5, 5)) +
   theme(axis.text.y = element_text(size = 12), 
         axis.text.x = element_text(size = 14),
         axis.title = element_text(size = 14),
@@ -48,7 +52,7 @@ size_plot <- ggplot(dataframe_matrisome, aes(x = log2FoldChange, y = `Annotated 
 print(size_plot)
 
 # Save the plot to a file as pdf
-ggsave(filename = "output/DEplot_corematrisome_all.pdf", plot = size_plot, width = 10, height = 12)
+ggsave(filename = output_file, plot = size_plot, width = 10, height = 12)
 
 # Print summary statistics
 cat("Summary of Core Matrisome DEGs:\n")

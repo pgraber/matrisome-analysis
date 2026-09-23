@@ -31,9 +31,9 @@ DESEQ_results_sig <- DESEQ_results %>%
 
 # Read all gProfiler files to calculate global limits from combined datasets
 gprofiler_files <- c(
-  "data/gProfiler/gProfiler_hsapiens_12-8-2025_9-23-12 pm__intersections_MF.csv",
-  "data/gProfiler/gProfiler_hsapiens_12-8-2025_9-23-12 pm__intersections_BP.csv",
-  "data/gProfiler/gProfiler_hsapiens_12-8-2025_9-23-12 pm__intersections_CC.csv"
+  "data/raw/gProfiler/gProfiler_hsapiens_26-8-2025_8-56-28 am__intersections_MF.csv",
+  "data/raw/gProfiler/gProfiler_hsapiens_26-8-2025_8-56-28 am__intersections_BP.csv",
+  "data/raw/gProfiler/gProfiler_hsapiens_26-8-2025_8-56-28 am__intersections.csv"
 )
 
 # Function to process each gProfiler file and get genes with logFC

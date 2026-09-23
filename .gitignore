@@ -1,8 +1,8 @@
-# Data and outputs are never committed. The validation record is the exception.
+# No data and no outputs in this repository.
 data/
 results/
 figures/
-output/
+*.rds
 
 # R
 .Rproj.user/
@@ -12,10 +12,16 @@ output/
 renv/library/
 renv/staging/
 renv/local/
+renv/cellar/
 renv/python/
+renv/sandbox/
 
 # Snakemake
 .snakemake/
+
+# Quarto
+/.quarto/
+_site/
 
 # OS and editor
 .DS_Store

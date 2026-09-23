@@ -1,0 +1,10 @@
+project:
+  title: "ecm_landscape_phgg"
+  output-dir: docs/notebooks
+
+format:
+  html:
+    theme: cosmo
+    toc: true
+    code-fold: true
+    lightbox: true

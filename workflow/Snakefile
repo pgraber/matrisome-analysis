@@ -1,0 +1,105 @@
+rule all:
+	input:
+		"results/DESEQ2_results.csv",
+		"results/DESEQ2_results_sig.csv",
+		"results/DESEQ2_results_upregulated.csv",
+		"results/DESEQ2_results_downregulated.csv",
+		expand("results/enrichment/GOplot_chord_{ontology}.pdf", ontology=["MF", "BP", "CC"]),
+		"results/Matrisome_DESEQ_results_annotated.csv",
+		"results/Matrisome_DESEQ_results_annotated_sig.csv",
+		"results/CoreMatrisome_DESEQ_results_sig.csv",
+		"results/CoreMatrisome_DEG_barplot.pdf",
+		"results/dotplot_matrisome_all.pdf",
+		"results/dotplot_CoreMatrisome.pdf",
+		"results/pvalue_dotplot_core_matrisome.pdf",
+		"results/pca_all_genes.pdf",
+		"results/pca_housekeeping.pdf",
+		"results/pca_all_genes_average.pdf",
+		"results/pca_housekeeping_average.pdf",
+		"results/housekeeping_boxplots"
+
+rule differential_expression:
+	input:
+		zero_counts="data/raw/ZERO_RNAseq/ZERO_GeneExpression_rawCounts_CNS_NB_Sarcoma_mRNA_24052024.txt",
+		normal_counts="data/raw/PsychENCODE/mRNA-seq_hg38.gencode21.wholeGene.geneComposite.STAR.nochrM.gene.count.txt",
+		metadata="data/raw/various/ZERO_psychencode_metadata_average.xlsx"
+	output:
+		all="results/DESEQ2_results.csv",
+		sig="results/DESEQ2_results_sig.csv",
+		up="results/DESEQ2_results_upregulated.csv",
+		down="results/DESEQ2_results_downregulated.csv"
+	script:
+		"../scripts/differential_expression.R"
+
+rule enrichment_analysis:
+	input:
+		deseq_results="results/DESEQ2_results.csv",
+		gprofiler_data="data/raw/gProfiler/gProfiler_hsapiens_26-8-2025_8-56-28 am__intersections_{ontology}.csv"
+	output:
+		chord_plot="results/enrichment/GOplot_chord_{ontology}.pdf",
+		circ_data="results/enrichment/circ_data_{ontology}.csv"
+	script:
+		"../scripts/enrichment_analysis.R"
+
+rule annotate_matrisome:
+    input:
+        all_results="results/DESEQ2_results.csv",
+        sig_results="results/DESEQ2_results_sig.csv"
+    output:
+        all_annotated="results/Matrisome_DESEQ_results_annotated.csv",
+        sig_annotated="results/Matrisome_DESEQ_results_annotated_sig.csv",
+        core_sig="results/CoreMatrisome_DESEQ_results_sig.csv"
+    script:
+        "../scripts/annotate_matrisome.R"
+
+rule deg_barplot:
+    input:
+        deseq_sig="results/DESEQ2_results_sig.csv",
+        matrisome="results/CoreMatrisome_DESEQ_results_sig.csv"
+    output:
+        "results/CoreMatrisome_DEG_barplot.pdf"
+    script:
+        "../scripts/deg_barplot.R"
+
+rule matrisome_dotplot:
+    input:
+        "results/Matrisome_DESEQ_results_annotated.csv"
+    output:
+        "results/dotplot_matrisome_all.pdf"
+    script:
+        "../scripts/matrisome_dotplot.R"
+
+rule core_matrisome_dotplot:
+    input:
+        "results/CoreMatrisome_DESEQ_results_sig.csv"
+    output:
+        "results/dotplot_CoreMatrisome.pdf"
+    script:
+        "../scripts/core_matrisome_dotplot.R"
+
+rule pvalue_dotplot_core_matrisome:
+    input:
+        "results/CoreMatrisome_DESEQ_results_sig.csv"
+    output:
+        "results/pvalue_dotplot_core_matrisome.pdf"
+    script:
+        "../scripts/pvalue_dotplot.R"
+
+# Dataset-evaluation figures (thesis Ch3 Figs 3.1–3.4, 3.7): PCA of tumour vs normal
+# and housekeeping-gene stability boxplots across brain regions. Runs directly on the
+# raw counts (independent of the differential-expression chain above).
+rule pca_and_housekeeping:
+    input:
+        zero_counts="data/raw/ZERO_RNAseq/ZERO_GeneExpression_rawCounts_CNS_NB_Sarcoma_mRNA_24052024.txt",
+        normal_counts="data/raw/PsychENCODE/mRNA-seq_hg38.gencode21.wholeGene.geneComposite.STAR.nochrM.gene.count.txt",
+        metadata="data/raw/various/ZERO_psychencode_metadata_new.csv",
+        metadata_average="data/raw/various/ZERO_psychencode_metadata_average.xlsx",
+        housekeeping="data/raw/Housekeeping_genes/MostStable.csv"
+    output:
+        pca_all="results/pca_all_genes.pdf",
+        pca_housekeeping="results/pca_housekeeping.pdf",
+        pca_all_average="results/pca_all_genes_average.pdf",
+        pca_housekeeping_average="results/pca_housekeeping_average.pdf",
+        boxplots=directory("results/housekeeping_boxplots")
+    script:
+        "../scripts/pca_brain_region_analysis.R"
